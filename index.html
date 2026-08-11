@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>참석자 대조대 — 수자원2부</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+:root{
+  --ground:#EEF1F4;
+  --panel:#FFFFFF;
+  --ink:#16212E;
+  --muted:#6B7785;
+  --hair:#D5DCE3;
+  --accent:#C4551F;
+  --accent-soft:#FBEDE6;
+  --ok:#1F7A5C;
+  --ok-soft:#E6F2ED;
+  --warn:#B57408;
+  --warn-soft:#FBF0DC;
+  --miss:#A33B34;
+  --miss-soft:#FAEAE8;
+  --mono:"JetBrains Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{
+  font-family:Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  background:var(--ground);color:var(--ink);
+  font-size:14px;line-height:1.55;-webkit-font-smoothing:antialiased;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+button{font-family:inherit;font-size:13px;cursor:pointer}
+input{font-family:inherit;font-size:13px}
+.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* ── 상단 바 ─────────────────────────── */
+header{
+  display:flex;align-items:center;gap:14px;
+  padding:0 18px;height:52px;flex:0 0 auto;
+  background:var(--panel);border-bottom:1px solid var(--hair);
+}
+.mark{width:11px;height:11px;background:var(--accent);transform:rotate(45deg);flex:0 0 auto}
+h1{font-size:15px;font-weight:600;margin:0;letter-spacing:-.01em}
+.dept{font-size:12px;color:var(--muted);border-left:1px solid var(--hair);padding-left:14px}
+.spacer{flex:1}
+.btn{
+  border:1px solid var(--hair);background:var(--panel);color:var(--ink);
+  padding:6px 13px;border-radius:6px;transition:border-color .12s,background .12s;
+}
+.btn:hover{border-color:var(--ink)}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.btn:disabled:hover{border-color:var(--hair)}
+.btn.primary{background:var(--ink);color:#fff;border-color:var(--ink)}
+.btn.primary:hover{background:#000}
+.btn.small{padding:4px 9px;font-size:12px}
+.toggle{display:flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);user-select:none;cursor:pointer}
+
+/* ── 본문 3분할 ─────────────────────── */
+main{flex:1;display:grid;grid-template-columns:minmax(240px,1fr) 2fr;min-height:0}
+.col{display:flex;flex-direction:column;min-height:0}
+.right{display:grid;grid-template-rows:auto minmax(0,1fr) auto;min-height:0}
+.pane{background:var(--panel);border:1px solid var(--hair);margin:8px;border-radius:8px;display:flex;flex-direction:column;min-height:0}
+.right .pane{margin:8px 8px 0 0}
+.right .pane:last-child{margin-bottom:8px}
+.pane-head{
+  display:flex;align-items:center;gap:9px;padding:9px 13px;
+  border-bottom:1px solid var(--hair);flex:0 0 auto;
+}
+.pane-title{font-size:12px;font-weight:600;letter-spacing:.02em}
+.pane-note{font-size:11px;color:var(--muted)}
+.pane-body{overflow-y:auto;flex:1;min-height:0}
+
+/* ── 좌: 명부 ────────────────────────── */
+.roster-row{
+  display:flex;align-items:center;gap:10px;padding:6px 13px;
+  border-bottom:1px solid #F0F3F6;transition:opacity .2s;
+}
+.roster-row:last-child{border-bottom:none}
+.roster-row img{width:30px;height:30px;border-radius:50%;object-fit:cover;background:var(--ground);flex:0 0 auto}
+.roster-name{font-size:13px;font-weight:500}
+.roster-rank{font-size:11px;color:var(--muted);margin-left:4px}
+.roster-row.done{opacity:.32}
+.roster-row.done .roster-name{text-decoration:line-through;text-decoration-thickness:1px}
+.roster-tick{margin-left:auto;font-size:11px;color:var(--ok);font-weight:600}
+
+/* ── 우상: 크롭 스트립 ───────────────── */
+.strip{display:flex;gap:8px;overflow-x:auto;padding:11px 13px;align-items:flex-start}
+.chip{
+  flex:0 0 auto;width:62px;border:none;background:none;padding:0;
+  display:flex;flex-direction:column;align-items:center;gap:4px;
+}
+.chip img{
+  width:56px;height:56px;object-fit:cover;border-radius:7px;
+  border:2px solid var(--hair);transition:transform .1s;
+}
+.chip:hover img{transform:scale(1.05)}
+.chip.sel img{border-color:var(--ink);box-shadow:0 0 0 2px var(--ground),0 0 0 3px var(--ink)}
+.chip .lbl{font-size:10px;color:var(--muted);max-width:62px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chip.s-auto img{border-color:var(--ok)}
+.chip.s-review img{border-color:var(--warn)}
+.chip.s-unknown img{border-color:var(--miss)}
+.chip.s-excluded img{border-color:var(--hair);opacity:.4}
+.chip.s-manual img{border-color:var(--accent)}
+
+/* ── 우중: 대조대 ────────────────────── */
+.bench{padding:16px;display:flex;flex-direction:column;gap:14px}
+.compare{display:flex;align-items:center;justify-content:center;gap:20px}
+.face-slot{text-align:center}
+.face-slot img{
+  width:132px;height:132px;object-fit:cover;border-radius:10px;
+  border:1px solid var(--hair);background:var(--ground);display:block;
+}
+.face-cap{font-size:11px;color:var(--muted);margin-top:6px}
+.gauge{text-align:center;min-width:78px}
+.gauge .val{font-family:var(--mono);font-size:26px;font-weight:500;letter-spacing:-.02em}
+.gauge .unit{font-size:10px;color:var(--muted);letter-spacing:.06em;margin-top:1px}
+.g-auto .val{color:var(--ok)}.g-review .val{color:var(--warn)}.g-unknown .val{color:var(--miss)}
+
+.verdict{
+  display:inline-flex;align-items:center;gap:6px;align-self:center;
+  padding:3px 11px;border-radius:20px;font-size:12px;font-weight:600;
+}
+.v-auto{background:var(--ok-soft);color:var(--ok)}
+.v-review{background:var(--warn-soft);color:var(--warn)}
+.v-unknown{background:var(--miss-soft);color:var(--miss)}
+.v-excluded{background:var(--ground);color:var(--muted)}
+.v-manual{background:var(--accent-soft);color:var(--accent)}
+
+.cand-label{font-size:11px;color:var(--muted);letter-spacing:.03em;border-top:1px solid var(--hair);padding-top:12px}
+.cands{display:flex;gap:9px;flex-wrap:wrap}
+.cand{
+  border:1px solid var(--hair);background:var(--panel);border-radius:8px;
+  padding:8px;width:88px;text-align:center;transition:border-color .12s,background .12s;
+}
+.cand:hover{border-color:var(--ink);background:#FAFBFC}
+.cand.picked{border-color:var(--ok);background:var(--ok-soft)}
+.cand img{width:52px;height:52px;border-radius:50%;object-fit:cover;background:var(--ground)}
+.cand .nm{font-size:12px;font-weight:500;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cand .dv{font-family:var(--mono);font-size:10px;color:var(--muted)}
+.row-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.manual-in{border:1px solid var(--hair);border-radius:6px;padding:6px 10px;width:190px}
+.manual-in:focus{outline:none;border-color:var(--ink)}
+
+.empty{
+  height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:8px;color:var(--muted);text-align:center;padding:30px;
+}
+.empty strong{color:var(--ink);font-size:14px;font-weight:600}
+
+/* ── 우하: 상태바 ────────────────────── */
+.statusbar{
+  display:flex;align-items:center;gap:16px;padding:9px 14px;flex:0 0 auto;
+  background:var(--panel);border:1px solid var(--hair);border-radius:8px;margin:8px 8px 8px 0;
+}
+.stat{display:flex;align-items:baseline;gap:5px;font-size:12px;color:var(--muted)}
+.stat b{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--ink)}
+.stat.ok b{color:var(--ok)}.stat.review b{color:var(--warn)}.stat.miss b{color:var(--miss)}
+.bar{flex:1;height:5px;background:var(--ground);border-radius:3px;overflow:hidden;min-width:60px}
+.bar i{display:block;height:100%;background:var(--ok);width:0;transition:width .3s}
+
+/* ── 오버레이 / 모달 ─────────────────── */
+.overlay{
+  position:fixed;inset:0;background:rgba(22,33,46,.55);
+  display:flex;align-items:center;justify-content:center;padding:26px;z-index:50;
+}
+.overlay[hidden]{display:none}
+.modal{
+  background:var(--panel);border-radius:12px;width:100%;max-width:940px;
+  max-height:100%;display:flex;flex-direction:column;overflow:hidden;
+}
+.modal-head{display:flex;align-items:center;gap:12px;padding:15px 18px;border-bottom:1px solid var(--hair)}
+.modal-head h2{margin:0;font-size:14px;font-weight:600}
+.modal-body{overflow-y:auto;padding:18px;flex:1}
+.modal-foot{display:flex;gap:10px;align-items:center;padding:13px 18px;border-top:1px solid var(--hair)}
+.drop{
+  border:1.5px dashed var(--hair);border-radius:10px;padding:34px;text-align:center;
+  color:var(--muted);transition:border-color .15s,background .15s;cursor:pointer;
+}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.enroll-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(272px,1fr));gap:11px}
+.enroll{display:flex;gap:10px;align-items:center;border:1px solid var(--hair);border-radius:8px;padding:8px}
+.enroll img.face{width:46px;height:46px;border-radius:50%;object-fit:cover;flex:0 0 auto;background:var(--ground)}
+.enroll .fields{flex:1;min-width:0;display:flex;flex-direction:column;gap:5px}
+.enroll img.strip-img{width:100%;height:20px;object-fit:cover;object-position:left center;border-radius:3px;background:var(--ground)}
+.enroll input{border:1px solid var(--hair);border-radius:5px;padding:4px 7px;width:100%}
+.enroll input:focus{outline:none;border-color:var(--ink)}
+
+/* ── 진행 표시 / 토스트 ──────────────── */
+.busy{
+  position:fixed;inset:0;background:rgba(238,241,244,.9);z-index:60;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+}
+.busy[hidden]{display:none}
+.busy .msg{font-size:13px;font-weight:500}
+.busy .sub{font-size:12px;color:var(--muted);font-family:var(--mono)}
+.spin{width:22px;height:22px;border:2px solid var(--hair);border-top-color:var(--accent);border-radius:50%;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2s}}
+
+#toasts{position:fixed;right:18px;bottom:18px;display:flex;flex-direction:column;gap:8px;z-index:70;max-width:310px}
+.toast{
+  background:var(--ink);color:#fff;padding:10px 14px;border-radius:8px;font-size:13px;
+  box-shadow:0 6px 20px rgba(22,33,46,.22);animation:pop .25s ease-out;
+}
+.toast .who{color:#9FB0C0;font-size:11px;display:block;margin-bottom:1px}
+@keyframes pop{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.toast{animation:none}}
+
+.err{background:var(--miss-soft);color:var(--miss);padding:10px 13px;border-radius:7px;font-size:12px;margin-bottom:12px}
+.field{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.field input[type=number]{width:52px;border:1px solid var(--hair);border-radius:5px;padding:3px 6px}
+</style>
+</head>
+<body>
+
+<header>
+  <span class="mark" aria-hidden="true"></span>
+  <h1>참석자 대조대</h1>
+  <span class="dept">수자원2부 · AI 세미나</span>
+  <span class="spacer"></span>
+  <label class="toggle"><input type="checkbox" id="humorOn" checked> 한마디 켜기</label>
+  <button class="btn" id="btnEnroll">명부 만들기</button>
+  <button class="btn primary" id="btnProbe">현장 사진 넣기</button>
+</header>
+
+<main>
+  <div class="col">
+    <section class="pane" style="margin-right:0">
+      <div class="pane-head">
+        <span class="pane-title">직원 명부</span>
+        <span class="pane-note" id="rosterNote">비어 있음</span>
+        <span class="spacer"></span>
+        <button class="btn small" id="btnClearGallery">비우기</button>
+      </div>
+      <div class="pane-body" id="roster">
+        <div class="empty"><strong>명부가 없습니다</strong><span>인트라넷 직원DB 캡쳐 이미지를 넣어<br>명부를 먼저 만드세요.</span></div>
+      </div>
+    </section>
+  </div>
+
+  <div class="col right">
+    <section class="pane">
+      <div class="pane-head">
+        <span class="pane-title">검출된 얼굴</span>
+        <span class="pane-note" id="stripNote">현장 사진 대기 중</span>
+        <span class="spacer"></span>
+        <button class="btn small" id="btnViewSource" disabled>원본 사진 보기</button>
+      </div>
+      <div class="strip" id="strip"></div>
+    </section>
+
+    <section class="pane">
+      <div class="pane-head">
+        <span class="pane-title">대조</span>
+        <span class="pane-note" id="benchNote"></span>
+      </div>
+      <div class="pane-body" id="bench">
+        <div class="empty"><strong>대조할 얼굴이 없습니다</strong><span>위에서 얼굴을 고르면 여기에 후보가 나옵니다.</span></div>
+      </div>
+    </section>
+
+    <div class="statusbar">
+      <div class="stat ok"><b id="cAuto">0</b> 확정</div>
+      <div class="stat review"><b id="cReview">0</b> 검토</div>
+      <div class="stat miss"><b id="cUnknown">0</b> 미확인</div>
+      <div class="stat"><b id="cExcluded">0</b> 비대상</div>
+      <div class="bar"><i id="progBar"></i></div>
+      <button class="btn small" id="btnXlsx" disabled>xlsx 내려받기</button>
+      <button class="btn small" id="btnDoc" disabled>doc 내려받기</button>
+    </div>
+  </div>
+</main>
+
+<!-- 명부 만들기 -->
+<div class="overlay" id="enrollOverlay" hidden>
+  <div class="modal">
+    <div class="modal-head">
+      <h2>명부 만들기</h2>
+      <span class="pane-note">직원DB 캡쳐 이미지에서 얼굴을 뽑고, 이름은 직접 적습니다</span>
+      <span class="spacer"></span>
+      <button class="btn small" data-close>닫기</button>
+    </div>
+    <div class="modal-body">
+      <div id="enrollErr"></div>
+      <div class="drop" id="enrollDrop">
+        캡쳐 이미지를 끌어다 놓거나 눌러서 고르세요 · 여러 장 한꺼번에 가능
+        <input type="file" id="enrollFiles" accept="image/*" multiple hidden>
+      </div>
+      <div class="enroll-grid" id="enrollGrid" style="margin-top:16px"></div>
+    </div>
+    <div class="modal-foot">
+      <span class="pane-note" id="enrollCount"></span>
+      <span class="spacer"></span>
+      <button class="btn primary" id="btnSaveEnroll" disabled>명부에 넣기</button>
+    </div>
+  </div>
+</div>
+
+<!-- 현장 사진 -->
+<div class="overlay" id="probeOverlay" hidden>
+  <div class="modal" style="max-width:620px">
+    <div class="modal-head">
+      <h2>현장 사진 넣기</h2>
+      <span class="spacer"></span>
+      <button class="btn small" data-close>닫기</button>
+    </div>
+    <div class="modal-body">
+      <div id="probeErr"></div>
+      <div class="drop" id="probeDrop">
+        세미나 사진을 끌어다 놓거나 눌러서 고르세요
+        <input type="file" id="probeFiles" accept="image/*" multiple hidden>
+      </div>
+      <div style="display:flex;gap:20px;margin-top:16px;flex-wrap:wrap">
+        <label class="field">분할 검출 <input type="number" id="tileN" min="1" max="4" value="2"> × 격자</label>
+        <label class="field"><input type="checkbox" id="dedupOn" checked> 사진 간 중복 인물 합치기</label>
+      </div>
+      <p class="pane-note" style="margin:10px 0 0">뒷줄 얼굴이 작으면 분할 검출을 2 이상으로 올리세요. 느려지는 대신 작은 얼굴을 더 잡습니다.</p>
+    </div>
+  </div>
+</div>
+
+<!-- 원본 사진 -->
+<div class="overlay" id="sourceOverlay" hidden>
+  <div class="modal" style="max-width:1100px">
+    <div class="modal-head">
+      <h2>원본 사진</h2>
+      <span class="pane-note">자리 배치를 확인할 때만 씁니다</span>
+      <span class="spacer"></span>
+      <button class="btn small" data-close>닫기</button>
+    </div>
+    <div class="modal-body" id="sourceBody"></div>
+  </div>
+</div>
+
+<div class="busy" id="busy" hidden>
+  <div class="spin"></div>
+  <div class="msg" id="busyMsg">준비 중</div>
+  <div class="sub" id="busySub"></div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/dist/face-api.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+const MODEL_URL = "https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.15/model";
+
+// 유클리드 거리 기준. 값이 작을수록 같은 사람.
+const T_AUTO = 0.44;   // 이 아래면 자동 확정
+const T_REVIEW = 0.62; // 이 아래면 검토 대상, 넘으면 미확인
+const T_DEDUP = 0.42;  // 사진 간 동일 인물로 묶는 기준
+const T_TWIN = 0.035;  // 1·2위 차이가 이보다 작으면 헷갈리는 경우
+
+let gallery = [];      // {id,name,rank,thumb,desc}
+let photos = [];       // {id,label,url,w,h}
+let faces = [];        // {id,photoId,box,crop,desc,status,matchId,cands,manualName}
+let selectedFace = null;
+let pending = [];      // 명부 만들기 대기 목록
+let modelsReady = false;
+
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+
+/* ══ 저장소 ══════════════════════════ */
+function db(){
+  return new Promise((res,rej)=>{
+    const r = indexedDB.open("attendee-bench",1);
+    r.onupgradeneeded = () => r.result.createObjectStore("gallery",{keyPath:"id"});
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function saveGallery(){
+  const d = await db();
+  const tx = d.transaction("gallery","readwrite");
+  const st = tx.objectStore("gallery");
+  st.clear();
+  gallery.forEach(g => st.put({...g, desc:Array.from(g.desc)}));
+  return new Promise(r => tx.oncomplete = r);
+}
+async function loadGallery(){
+  try{
+    const d = await db();
+    const rows = await new Promise((res,rej)=>{
+      const q = d.transaction("gallery").objectStore("gallery").getAll();
+      q.onsuccess = ()=>res(q.result); q.onerror = ()=>rej(q.error);
+    });
+    gallery = rows.map(r => ({...r, desc:new Float32Array(r.desc)}));
+  }catch(e){ gallery = []; }
+}
+
+/* ══ 모델 ════════════════════════════ */
+async function ensureModels(){
+  if(modelsReady) return;
+  busy("얼굴 인식 모델을 받는 중","처음 한 번만 받습니다");
+  await faceapi.nets.ssdMobilenetv1.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+  await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+  modelsReady = true;
+}
+
+/* ══ 유틸 ════════════════════════════ */
+function busy(msg,sub){ $("#busyMsg").textContent = msg; $("#busySub").textContent = sub||""; $("#busy").hidden = false; }
+function idle(){ $("#busy").hidden = true; }
+function dist(a,b){ let s=0; for(let i=0;i<a.length;i++){ const d=a[i]-b[i]; s+=d*d; } return Math.sqrt(s); }
+const uid = (()=>{ let n=0; return p => p+(++n); })();
+
+async function fileToCanvas(file){
+  const bmp = await createImageBitmap(file,{imageOrientation:"from-image"});
+  const c = document.createElement("canvas");
+  c.width = bmp.width; c.height = bmp.height;
+  c.getContext("2d").drawImage(bmp,0,0);
+  bmp.close();
+  return c;
+}
+function cropDataURL(src,x,y,w,h,size,pad=0){
+  const px = w*pad, py = h*pad;
+  const sx = Math.max(0,x-px), sy = Math.max(0,y-py);
+  const sw = Math.min(src.width-sx, w+px*2), sh = Math.min(src.height-sy, h+py*2);
+  const c = document.createElement("canvas");
+  const side = size || Math.max(sw,sh);
+  c.width = side; c.height = side;
+  const ctx = c.getContext("2d");
+  ctx.fillStyle = "#EEF1F4"; ctx.fillRect(0,0,side,side);
+  const scale = Math.min(side/sw, side/sh);
+  ctx.drawImage(src, sx,sy,sw,sh, (side-sw*scale)/2, (side-sh*scale)/2, sw*scale, sh*scale);
+  return c.toDataURL("image/jpeg",0.85);
+}
+function iou(a,b){
+  const x1 = Math.max(a.x,b.x), y1 = Math.max(a.y,b.y);
+  const x2 = Math.min(a.x+a.width,b.x+b.width), y2 = Math.min(a.y+a.height,b.y+b.height);
+  const inter = Math.max(0,x2-x1)*Math.max(0,y2-y1);
+  return inter / (a.width*a.height + b.width*b.height - inter);
+}
+
+/* ══ 검출 ════════════════════════════ */
+async function detect(canvas, tiles=1, minConf=0.25){
+  const opts = new faceapi.SsdMobilenetv1Options({minConfidence:minConf});
+  const out = [];
+  const passes = [{x:0,y:0,w:canvas.width,h:canvas.height}];
+  if(tiles>1){
+    const ov = 0.22;
+    const tw = canvas.width/tiles, th = canvas.height/tiles;
+    for(let r=0;r<tiles;r++) for(let c=0;c<tiles;c++){
+      const x = Math.max(0, c*tw - tw*ov), y = Math.max(0, r*th - th*ov);
+      passes.push({
+        x, y,
+        w: Math.min(canvas.width-x, tw*(1+ov*2)),
+        h: Math.min(canvas.height-y, th*(1+ov*2))
+      });
+    }
+  }
+  for(const p of passes){
+    let target = canvas;
+    if(p.w !== canvas.width || p.h !== canvas.height){
+      target = document.createElement("canvas");
+      target.width = p.w; target.height = p.h;
+      target.getContext("2d").drawImage(canvas, p.x,p.y,p.w,p.h, 0,0,p.w,p.h);
+    }
+    const res = await faceapi.detectAllFaces(target,opts).withFaceLandmarks().withFaceDescriptors();
+    res.forEach(r => out.push({
+      box:{x:r.detection.box.x+p.x, y:r.detection.box.y+p.y, width:r.detection.box.width, height:r.detection.box.height},
+      score:r.detection.score,
+      desc:r.descriptor
+    }));
+  }
+  // 겹친 검출 정리
+  out.sort((a,b)=>b.score-a.score);
+  const keep = [];
+  for(const d of out) if(!keep.some(k => iou(k.box,d.box) > 0.35)) keep.push(d);
+  return keep;
+}
+
+/* ══ 명부 만들기 ═════════════════════ */
+async function handleEnrollFiles(files){
+  $("#enrollErr").innerHTML = "";
+  try{ await ensureModels(); }
+  catch(e){ idle(); $("#enrollErr").innerHTML = '<div class="err">모델을 받지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.</div>'; return; }
+  for(let i=0;i<files.length;i++){
+    busy("캡쳐 이미지에서 얼굴을 찾는 중",`${i+1} / ${files.length}`);
+    const canvas = await fileToCanvas(files[i]);
+    const found = await detect(canvas,1,0.35);
+    found.sort((a,b)=>a.box.y-b.box.y);
+    for(const f of found){
+      const nameX = f.box.x + f.box.width + 6;
+      const nameW = Math.max(40, canvas.width - nameX);
+      pending.push({
+        id: uid("p"),
+        thumb: cropDataURL(canvas, f.box.x, f.box.y, f.box.width, f.box.height, 128, 0.22),
+        strip: cropDataURL(canvas, nameX, f.box.y, nameW, f.box.height, 0, 0),
+        desc: f.desc, text: ""
+      });
+    }
+  }
+  idle();
+  renderEnroll();
+}
+function renderEnroll(){
+  const g = $("#enrollGrid");
+  g.innerHTML = "";
+  pending.forEach(p => {
+    const el = document.createElement("div");
+    el.className = "enroll";
+    el.innerHTML = `<img class="face" src="${p.thumb}" alt="">
+      <div class="fields">
+        <img class="strip-img" src="${p.strip}" alt="캡쳐에서 잘라낸 이름 부분">
+        <input placeholder="이름 직급 (예: 홍창오 전무이사)" value="${p.text}">
+      </div>`;
+    el.querySelector("input").addEventListener("input", e => {
+      p.text = e.target.value;
+      $("#btnSaveEnroll").disabled = !pending.some(x => x.text.trim());
+      updateEnrollCount();
+    });
+    g.appendChild(el);
+  });
+  updateEnrollCount();
+  $("#btnSaveEnroll").disabled = !pending.some(x => x.text.trim());
+}
+function updateEnrollCount(){
+  const filled = pending.filter(p => p.text.trim()).length;
+  $("#enrollCount").textContent = pending.length ? `얼굴 ${pending.length}개 · 이름 적음 ${filled}개` : "";
+}
+async function commitEnroll(){
+  pending.filter(p => p.text.trim()).forEach(p => {
+    const parts = p.text.trim().split(/\s+/);
+    const rank = parts.length > 1 ? parts.pop() : "";
+    gallery.push({id:uid("g"), name:parts.join(" "), rank, thumb:p.thumb, desc:p.desc});
+  });
+  pending = [];
+  await saveGallery();
+  renderRoster();
+  $("#enrollOverlay").hidden = true;
+  renderEnroll();
+}
+
+/* ══ 현장 사진 처리 ══════════════════ */
+async function handleProbeFiles(files){
+  $("#probeErr").innerHTML = "";
+  if(!gallery.length){
+    $("#probeErr").innerHTML = '<div class="err">명부가 비어 있습니다. 먼저 직원DB 캡쳐로 명부를 만드세요.</div>';
+    return;
+  }
+  try{ await ensureModels(); }
+  catch(e){ idle(); $("#probeErr").innerHTML = '<div class="err">모델을 받지 못했습니다. 인터넷 연결을 확인하고 다시 시도하세요.</div>'; return; }
+  $("#probeOverlay").hidden = true;
+
+  const tiles = Math.max(1, Math.min(4, +$("#tileN").value || 1));
+  photos = []; faces = []; selectedFace = null;
+
+  for(let i=0;i<files.length;i++){
+    busy("얼굴을 찾는 중",`사진 ${i+1} / ${files.length}`);
+    const canvas = await fileToCanvas(files[i]);
+    const pid = uid("ph");
+    photos.push({id:pid, label:`사진 ${i+1}`, url:canvas.toDataURL("image/jpeg",0.7), w:canvas.width, h:canvas.height});
+    const found = await detect(canvas, tiles, 0.22);
+    found.sort((a,b)=>a.box.x-b.box.x);
+    found.forEach(f => faces.push({
+      id: uid("f"), photoId: pid, box: f.box,
+      crop: cropDataURL(canvas, f.box.x, f.box.y, f.box.width, f.box.height, 256, 0.3),
+      size: Math.round(f.box.width),
+      desc: f.desc, status:"unknown", matchId:null, cands:[], manualName:""
+    }));
+  }
+
+  if($("#dedupOn").checked) mergeDuplicates();
+  busy("명부와 대조하는 중","");
+  matchAll();
+  idle();
+  renderStrip(); renderRoster(); renderBench(); updateStats();
+  $("#btnViewSource").disabled = false;
+  $("#btnXlsx").disabled = $("#btnDoc").disabled = false;
+
+  const dropped = faces.filter(f => f.merged).length;
+  toast("검출 결과", `얼굴 ${faces.filter(f=>!f.merged).length}명${dropped?` · 중복 ${dropped}개 합침`:""}`);
+}
+function mergeDuplicates(){
+  for(let i=0;i<faces.length;i++){
+    if(faces[i].merged) continue;
+    for(let j=i+1;j<faces.length;j++){
+      if(faces[j].merged || faces[i].photoId === faces[j].photoId) continue;
+      if(dist(faces[i].desc, faces[j].desc) < T_DEDUP){
+        // 더 크게 찍힌 쪽을 남긴다
+        if(faces[j].size > faces[i].size){ faces[i].merged = true; faces[j].mergedFrom = (faces[j].mergedFrom||0)+1; break; }
+        faces[j].merged = true; faces[i].mergedFrom = (faces[i].mergedFrom||0)+1;
+      }
+    }
+  }
+  faces = faces.filter(f => !f.merged).concat(faces.filter(f => f.merged));
+}
+function matchAll(){
+  faces.filter(f=>!f.merged).forEach(f => {
+    f.cands = gallery.map(g => ({g, d: dist(f.desc, g.desc)})).sort((a,b)=>a.d-b.d).slice(0,5);
+    const best = f.cands[0];
+    if(!best){ f.status = "unknown"; return; }
+    if(best.d < T_AUTO){ f.status = "auto"; f.matchId = best.g.id; }
+    else if(best.d < T_REVIEW){ f.status = "review"; f.matchId = null; }
+    else { f.status = "unknown"; f.matchId = null; }
+  });
+  // 같은 사람에게 두 얼굴이 자동 확정되면 먼 쪽을 검토로 되돌린다
+  const claimed = {};
+  faces.filter(f=>f.status==="auto").forEach(f => {
+    const prev = claimed[f.matchId];
+    if(prev){
+      const loser = prev.cands[0].d <= f.cands[0].d ? f : prev;
+      loser.status = "review"; loser.matchId = null;
+      claimed[f.matchId] = loser === f ? prev : f;
+    } else claimed[f.matchId] = f;
+  });
+}
+
+/* ══ 그리기 ══════════════════════════ */
+function renderRoster(){
+  const used = new Set(faces.filter(f=>!f.merged && f.matchId).map(f=>f.matchId));
+  const el = $("#roster");
+  if(!gallery.length){
+    el.innerHTML = '<div class="empty"><strong>명부가 없습니다</strong><span>인트라넷 직원DB 캡쳐 이미지를 넣어<br>명부를 먼저 만드세요.</span></div>';
+    $("#rosterNote").textContent = "비어 있음"; return;
+  }
+  const order = [...gallery].sort((a,b) => (used.has(a.id)?1:0) - (used.has(b.id)?1:0));
+  el.innerHTML = order.map(g => `
+    <div class="roster-row ${used.has(g.id)?"done":""}">
+      <img src="${g.thumb}" alt="">
+      <span><span class="roster-name">${esc(g.name)}</span><span class="roster-rank">${esc(g.rank)}</span></span>
+      ${used.has(g.id)?'<span class="roster-tick">확정</span>':""}
+    </div>`).join("");
+  $("#rosterNote").textContent = `${gallery.length}명 중 ${gallery.length-used.size}명 남음`;
+}
+function renderStrip(){
+  const live = faces.filter(f=>!f.merged);
+  const el = $("#strip");
+  if(!live.length){ el.innerHTML = ""; $("#stripNote").textContent = "현장 사진 대기 중"; return; }
+  el.innerHTML = live.map(f => {
+    const g = f.matchId ? gallery.find(x=>x.id===f.matchId) : null;
+    const label = f.status==="manual" ? f.manualName : f.status==="excluded" ? "비대상" : g ? g.name : "?";
+    return `<button class="chip s-${f.status} ${selectedFace===f.id?"sel":""}" data-face="${f.id}">
+      <img src="${f.crop}" alt="검출된 얼굴"><span class="lbl">${esc(label)}</span></button>`;
+  }).join("");
+  $("#stripNote").textContent = `${live.length}명 · 사진 ${photos.length}장`;
+  $$("#strip .chip").forEach(c => c.onclick = () => { selectedFace = c.dataset.face; renderStrip(); renderBench(); });
+}
+function renderBench(){
+  const f = faces.find(x => x.id === selectedFace);
+  const el = $("#bench");
+  if(!f){
+    el.innerHTML = '<div class="empty"><strong>대조할 얼굴이 없습니다</strong><span>위에서 얼굴을 고르면 여기에 후보가 나옵니다.</span></div>';
+    $("#benchNote").textContent = ""; return;
+  }
+  const g = f.matchId ? gallery.find(x=>x.id===f.matchId) : null;
+  const d = f.cands[0] ? f.cands[0].d : null;
+  const cls = f.status==="auto"?"auto":f.status==="review"?"review":"unknown";
+  const verdict = {auto:"자동 확정",review:"검토 필요",unknown:"미확인",excluded:"비대상",manual:"직접 입력"}[f.status];
+
+  el.innerHTML = `<div class="bench">
+    <div class="compare">
+      <div class="face-slot"><img src="${f.crop}" alt="현장 사진에서 잘라낸 얼굴"><div class="face-cap">현장 · ${f.size}px${f.mergedFrom?` · ${f.mergedFrom+1}장에 등장`:""}</div></div>
+      <div class="gauge g-${cls}"><div class="val">${d===null?"—":d.toFixed(3)}</div><div class="unit">거리</div></div>
+      <div class="face-slot">
+        <img src="${g?g.thumb:""}" alt="${g?"명부 증명사진":"후보 없음"}">
+        <div class="face-cap">${g?esc(g.name)+" "+esc(g.rank):"확정 전"}</div>
+      </div>
+    </div>
+    <span class="verdict v-${f.status}">${verdict}</span>
+    <div class="cand-label">후보 ${f.cands.length}명 · 눌러서 확정</div>
+    <div class="cands">${f.cands.map(c=>`
+      <button class="cand ${f.matchId===c.g.id?"picked":""}" data-pick="${c.g.id}">
+        <img src="${c.g.thumb}" alt=""><div class="nm">${esc(c.g.name)}</div>
+        <div class="dv">${c.d.toFixed(3)}</div></button>`).join("")}</div>
+    <div class="row-actions">
+      <input class="manual-in" id="manualName" placeholder="명부에 없음 · 이름 직급" value="${esc(f.manualName)}">
+      <button class="btn small" id="btnManual">직접 입력으로 확정</button>
+      <button class="btn small" id="btnExclude">${f.status==="excluded"?"비대상 취소":"비대상으로 빼기"}</button>
+    </div>
+  </div>`;
+  $("#benchNote").textContent = photos.find(p=>p.id===f.photoId)?.label || "";
+
+  $$("#bench .cand").forEach(b => b.onclick = () => confirmMatch(f, b.dataset.pick));
+  $("#btnManual").onclick = () => {
+    const v = $("#manualName").value.trim();
+    if(!v) return;
+    f.manualName = v; f.status = "manual"; f.matchId = null;
+    if(humor()) toast("한마디","오늘 첫 출근이신가요? 환영합니다.");
+    renderStrip(); renderBench(); updateStats();
+  };
+  $("#btnExclude").onclick = () => {
+    f.status = f.status==="excluded" ? (f.cands[0] && f.cands[0].d < T_REVIEW ? "review" : "unknown") : "excluded";
+    f.matchId = null;
+    renderStrip(); renderRoster(); renderBench(); updateStats();
+  };
+}
+function confirmMatch(f, gid){
+  faces.filter(x => x!==f && x.matchId===gid).forEach(x => { x.matchId=null; x.status="review"; });
+  f.matchId = gid; f.status = "auto"; f.manualName = "";
+  const c = f.cands.find(c => c.g.id === gid);
+  if(c && humor()) quip(c, f);
+  renderStrip(); renderRoster(); renderBench(); updateStats();
+}
+
+/* ══ 한마디 ══════════════════════════ */
+function humor(){ return $("#humorOn").checked; }
+function quip(c, f){
+  const d = c.d, name = c.g.name + " " + c.g.rank;
+  const second = f.cands[1];
+  if(d < 0.22) return toast(name, "10년째 그대로시네요. 어느 피부과 다니세요?");
+  if(d >= 0.50) return toast(name, "사진이 너무 오래됐습니다. 사진관 한 번 다녀오시죠.");
+  if(second && second.d - d < T_TWIN) return toast(name, `${second.g.name} 님과 헷갈렸습니다. 혹시 쌍둥이신가요?`);
+  if(f.mergedFrom >= 2) return toast(name, "사진마다 다 계시네요. 오늘 주인공이십니다.");
+}
+function toast(who, msg){
+  const el = document.createElement("div");
+  el.className = "toast";
+  el.innerHTML = `<span class="who">${esc(who)}</span>${esc(msg)}`;
+  $("#toasts").appendChild(el);
+  setTimeout(()=>{ el.style.opacity="0"; el.style.transition="opacity .3s"; setTimeout(()=>el.remove(),300); }, 4200);
+}
+
+/* ══ 상태 / 내보내기 ═════════════════ */
+function updateStats(){
+  const live = faces.filter(f=>!f.merged);
+  const n = s => live.filter(f=>f.status===s).length;
+  const done = n("auto") + n("manual");
+  $("#cAuto").textContent = done;
+  $("#cReview").textContent = n("review");
+  $("#cUnknown").textContent = n("unknown");
+  $("#cExcluded").textContent = n("excluded");
+  const denom = live.filter(f=>f.status!=="excluded").length || 1;
+  $("#progBar").style.width = Math.round(done/denom*100) + "%";
+}
+function rows(){
+  return faces.filter(f=>!f.merged && (f.status==="auto"||f.status==="manual")).map((f,i) => {
+    const g = f.matchId ? gallery.find(x=>x.id===f.matchId) : null;
+    const nm = g ? g.name : f.manualName.split(/\s+/).slice(0,-1).join(" ") || f.manualName;
+    const rk = g ? g.rank : (f.manualName.split(/\s+/).length>1 ? f.manualName.split(/\s+/).pop() : "");
+    return {no:i+1, 부서:"수자원2부", 이름:nm, 직급:rk, 확인:f.status==="manual"?"직접 입력":"사진 대조"};
+  });
+}
+function exportXlsx(){
+  const data = rows();
+  if(!data.length) return toast("내보내기","확정된 참석자가 아직 없습니다.");
+  const ws = XLSX.utils.json_to_sheet(data.map(r => ({번호:r.no, 부서:r.부서, 이름:r.이름, 직급:r.직급, 확인방법:r.확인})));
+  ws["!cols"] = [{wch:6},{wch:12},{wch:12},{wch:12},{wch:12}];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "참석자");
+  XLSX.writeFile(wb, `참석자명단_${stamp()}.xlsx`);
+}
+function exportDoc(){
+  const data = rows();
+  if(!data.length) return toast("내보내기","확정된 참석자가 아직 없습니다.");
+  const body = data.map(r => `<tr><td>${r.no}</td><td>${esc(r.부서)}</td><td>${esc(r.이름)}</td><td>${esc(r.직급)}</td></tr>`).join("");
+  const html = `<html xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"></head><body>
+    <h2 style="font-family:맑은 고딕">AI 세미나 참석자 명단</h2>
+    <p style="font-family:맑은 고딕;font-size:10pt">수자원2부 · 총 ${data.length}명</p>
+    <table border="1" cellspacing="0" cellpadding="5" style="font-family:맑은 고딕;font-size:10pt;border-collapse:collapse">
+      <tr><th>번호</th><th>부서</th><th>이름</th><th>직급</th></tr>${body}</table></body></html>`;
+  const url = URL.createObjectURL(new Blob(["\ufeff"+html],{type:"application/msword"}));
+  const a = document.createElement("a");
+  a.href = url; a.download = `참석자명단_${stamp()}.doc`; a.click();
+  URL.revokeObjectURL(url);
+}
+function stamp(){ const d = new Date(); return `${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}`; }
+function esc(s){ return String(s??"").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c])); }
+
+/* ══ 연결 ════════════════════════════ */
+function wireDrop(dropId, inputId, handler){
+  const drop = $(dropId), input = $(inputId);
+  drop.onclick = () => input.click();
+  input.onchange = e => { if(e.target.files.length) handler([...e.target.files]); e.target.value = ""; };
+  ["dragenter","dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add("over"); }));
+  ["dragleave","drop"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove("over"); }));
+  drop.addEventListener("drop", e => {
+    const f = [...e.dataTransfer.files].filter(x => x.type.startsWith("image/"));
+    if(f.length) handler(f);
+  });
+}
+wireDrop("#enrollDrop","#enrollFiles",handleEnrollFiles);
+wireDrop("#probeDrop","#probeFiles",handleProbeFiles);
+
+$("#btnEnroll").onclick = () => $("#enrollOverlay").hidden = false;
+$("#btnProbe").onclick = () => $("#probeOverlay").hidden = false;
+$("#btnSaveEnroll").onclick = commitEnroll;
+$("#btnXlsx").onclick = exportXlsx;
+$("#btnDoc").onclick = exportDoc;
+$("#btnClearGallery").onclick = async () => {
+  if(!gallery.length) return;
+  if(!confirm("명부를 모두 지웁니다. 계속할까요?")) return;
+  gallery = []; await saveGallery(); renderRoster();
+};
+$("#btnViewSource").onclick = () => {
+  $("#sourceBody").innerHTML = photos.map(p =>
+    `<p class="pane-note" style="margin:0 0 6px">${esc(p.label)} · ${p.w}×${p.h}</p>
+     <img src="${p.url}" style="width:100%;border-radius:8px;margin-bottom:18px" alt="${esc(p.label)} 원본">`).join("");
+  $("#sourceOverlay").hidden = false;
+};
+$$("[data-close]").forEach(b => b.onclick = () => b.closest(".overlay").hidden = true);
+$$(".overlay").forEach(o => o.addEventListener("click", e => { if(e.target === o) o.hidden = true; }));
+document.addEventListener("keydown", e => { if(e.key === "Escape") $$(".overlay").forEach(o => o.hidden = true); });
+
+loadGallery().then(renderRoster);
+</script>
+</body>
+</html>
